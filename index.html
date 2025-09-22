@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="ar">
+<head>
+<meta charset="UTF-8">
+<title>البطولة الرئيسية</title>
+<style>
+body{font-family:Arial;direction:rtl;padding:20px;background:#f4f4f4;}
+table{border-collapse:collapse;width:100%;background:#fff;}
+th,td{border:1px solid #999;padding:6px;text-align:center;}
+th{background:#333;color:#fff;}
+button{padding:5px;margin:5px;}
+</style>
+</head>
+<body>
+<h1>البطولة الرئيسية</h1>
+<button onclick="location.href='admin.html'">صفحة الإدارة</button>
+<button onclick="location.href='program.html'">برنامج البطولة</button>
+
+<h2>ترتيب الفرق</h2>
+<table id="standings">
+<thead>
+<tr><th>الفريق</th><th>نقاط</th><th>لعب</th><th>فوز</th><th>تعادل</th><th>هزيمة</th><th>له</th><th>عليه</th><th>+/-</th></tr>
+</thead>
+<tbody></tbody>
+</table>
+
+<h2>آخر دورة</h2>
+<div id="lastRound"></div>
+<h2>الدورات السابقة</h2>
+<div id="previousRounds"></div>
+
+<script>
+const dbUrl="https://howat-b10bd-default-rtdb.europe-west1.firebasedatabase.app/";
+let teams=[], matchesData={};
+
+function loadTeams(){
+  fetch(`${dbUrl}/teams.json`).then(r=>r.json()).then(data=>{
+    teams = data ? Object.values(data) : [];
+    loadMatches();
+  });
+}
+
+function loadMatches(){
+  fetch(`${dbUrl}/matches.json`).then(r=>r.json()).then(data=>{
+    matchesData = data||{};
+    updateStandings();
+    renderRounds();
+  });
+}
+
+function updateStandings(){
+  let stats={}; teams.forEach(t=>stats[t]={points:0,played:0,wins:0,draws:0,losses:0,gf:0,ga:0});
+  Object.values(matchesData).forEach(m=>{
+    if(m.score1==null || m.score2==null) return;
+    stats[m.team1].played++; stats[m.team2].played++;
+    stats[m.team1].gf+=m.score1; stats[m.team1].ga+=m.score2;
+    stats[m.team2].gf+=m.score2; stats[m.team2].ga+=m.score1;
+    if(m.score1>m.score2){ stats[m.team1].wins++; stats[m.team1].points+=3; stats[m.team2].losses++; }
+    else if(m.score1<m.score2){ stats[m.team2].wins++; stats[m.team2].points+=3; stats[m.team1].losses++; }
+    else{ stats[m.team1].draws++; stats[m.team2].draws++; stats[m.team1].points++; stats[m.team2].points++; }
+  });
+
+  const tbody=document.querySelector("#standings tbody"); tbody.innerHTML="";
+  teams.slice().sort((a,b)=>{
+    if(stats[b].points!==stats[a].points) return stats[b].points-stats[a].points;
+    return (stats[b].gf-stats[b].ga)-(stats[a].gf-stats[a].ga);
+  }).forEach(t=>{
+    const s=stats[t];
+    tbody.innerHTML += `<tr><td>${t}</td><td>${s.points}</td><td>${s.played}</td><td>${s.wins}</td><td>${s.draws}</td><td>${s.losses}</td><td>${s.gf}</td><td>${s.ga}</td><td>${s.gf-s.ga}</td></tr>`;
+  });
+}
+
+function renderRounds(){
+  const rounds={};
+  Object.values(matchesData).forEach(m=>{
+    if(!rounds[m.round]) rounds[m.round]=[];
+    rounds[m.round].push(m);
+  });
+  const roundKeys=Object.keys(rounds).sort((a,b)=>a-b);
+  const lastRoundContainer=document.getElementById("lastRound");
+  const prevContainer=document.getElementById("previousRounds");
+  lastRoundContainer.innerHTML=""; prevContainer.innerHTML="";
+  if(roundKeys.length===0) return;
+  const lastRoundKey=roundKeys[roundKeys.length-1];
+  rounds[lastRoundKey].forEach(m=>{
+    if(m.score1!=null) lastRoundContainer.innerHTML+=`<div>${m.team1} ${m.score1} - ${m.score2} ${m.team2}</div>`;
+  });
+  roundKeys.slice(0,-1).reverse().forEach(rk=>{
+    rounds[rk].forEach(m=>{
+      if(m.score1!=null) prevContainer.innerHTML+=`<div>الدورة ${rk}: ${m.team1} ${m.score1} - ${m.score2} ${m.team2}</div>`;
+    });
+  });
+}
+
+loadTeams();
+</script>
+</body>
+</html>
