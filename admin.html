@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="ar">
+<head>
+<meta charset="UTF-8">
+<title>إدارة البطولة</title>
+<style>
+body{font-family:Arial;direction:rtl;padding:20px;background:#f4f4f4;}
+section{background:#fff;padding:15px;margin:15px 0;border-radius:8px;box-shadow:0 0 5px rgba(0,0,0,0.1);}
+input,select,button{margin:5px;padding:5px;}
+table{border-collapse:collapse;width:100%;}
+th,td{border:1px solid #999;padding:6px;text-align:center;}
+th{background:#333;color:#fff;}
+</style>
+</head>
+<body>
+
+<h1>صفحة الإدارة</h1>
+
+<section>
+<h2>إضافة فريق</h2>
+<input type="text" id="teamName" placeholder="اسم الفريق">
+<button onclick="addTeam()">أضف الفريق</button>
+<ul id="teamList"></ul>
+</section>
+
+<section>
+<h2>إضافة مباراة</h2>
+<label>الدورة: <input type="number" id="matchRound" min="1"></label><br>
+<select id="team1"></select> ضد <select id="team2"></select>
+<button onclick="addMatch()">أضف المباراة</button>
+<ul id="matchList"></ul>
+</section>
+
+<section>
+<h2>إدخال نتائج الدورة</h2>
+<label>اختر دورة: <select id="roundSelect" onchange="loadMatchesForResults()"></select></label>
+<div id="matchResults"></div>
+<button onclick="saveResults()">حفظ النتائج</button>
+</section>
+
+<script>
+const dbUrl="https://howat-b10bd-default-rtdb.europe-west1.firebasedatabase.app/";
+let teams=[], matchesData={};
+
+// ------------------- إدارة الفرق -------------------
+function loadTeams(){
+  fetch(`${dbUrl}/teams.json`).then(r=>r.json()).then(data=>{
+    teams = data ? Object.values(data) : [];
+    renderTeams();
+    renderTeamSelects();
+  });
+}
+function renderTeams(){
+  const ul=document.getElementById("teamList"); ul.innerHTML="";
+  teams.forEach((t,i)=>{const li=document.createElement("li"); li.textContent=t; ul.appendChild(li);});
+}
+function renderTeamSelects(){
+  const s1=document.getElementById("team1"), s2=document.getElementById("team2");
+  s1.innerHTML=""; s2.innerHTML="";
+  teams.forEach(t=>{
+    const o1=document.createElement("option"); o1.value=t; o1.textContent=t; s1.appendChild(o1);
+    const o2=document.createElement("option"); o2.value=t; o2.textContent=t; s2.appendChild(o2);
+  });
+}
+function addTeam(){
+  const name=document.getElementById("teamName").value.trim();
+  if(!name) return alert("ادخل اسم الفريق");
+  fetch(`${dbUrl}/teams.json`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(name)})
+    .then(()=>{document.getElementById("teamName").value=""; loadTeams();});
+}
+
+// ------------------- إدارة المباريات -------------------
+function loadMatches(){
+  fetch(`${dbUrl}/matches.json`).then(r=>r.json()).then(data=>{
+    matchesData = data||{};
+    renderMatches();
+    loadRoundsInSelect();
+  });
+}
+function renderMatches(){
+  const ul=document.getElementById("matchList"); ul.innerHTML="";
+  Object.entries(matchesData).forEach(([id,m])=>{
+    const li=document.createElement("li");
+    const score1=m.score1!=null?m.score1:"-";
+    const score2=m.score2!=null?m.score2:"-";
+    li.textContent=`الدورة ${m.round}: ${m.team1} ${score1} - ${score2} ${m.team2}`;
+    ul.appendChild(li);
+  });
+}
+function addMatch(){
+  const round=document.getElementById("matchRound").value;
+  const t1=document.getElementById("team1").value;
+  const t2=document.getElementById("team2").value;
+  if(!round || t1===t2) return alert("اختر دورة وفريقين مختلفين");
+  const newMatch={round:round,team1:t1,team2:t2,score1:null,score2:null};
+  fetch(`${dbUrl}/matches.json`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(newMatch)})
+    .then(()=>{document.getElementById("matchRound").value=""; loadMatches();});
+}
+
+// ------------------- إدخال النتائج -------------------
+function loadRoundsInSelect(){
+  const sel=document.getElementById("roundSelect"); sel.innerHTML="";
+  const roundsSet=new Set(Object.values(matchesData).map(m=>m.round));
+  [...roundsSet].sort((a,b)=>a-b).forEach(r=>{sel.innerHTML += `<option value="${r}">الدورة ${r}</option>`;});
+  loadMatchesForResults();
+}
+function loadMatchesForResults(){
+  const sel=document.getElementById("roundSelect").value;
+  const container=document.getElementById("matchResults"); container.innerHTML="";
+  Object.entries(matchesData).forEach(([id,m])=>{
+    if(m.round!=sel) return;
+    const div=document.createElement("div");
+    const s1=m.score1!=null?m.score1:"";
+    const s2=m.score2!=null?m.score2:"";
+    div.innerHTML=`${m.team1} <input type="number" id="s1_${id}" value="${s1}" min="0"> - <input type="number" id="s2_${id}" value="${s2}" min="0"> ${m.team2}`;
+    container.appendChild(div);
+  });
+}
+function saveResults(){
+  Object.entries(matchesData).forEach(([id,m])=>{
+    const s1=document.getElementById(`s1_${id}`);
+    const s2=document.getElementById(`s2_${id}`);
+    if(!s1 || !s2) return;
+    m.score1=Number(s1.value); m.score2=Number(s2.value);
+    fetch(`${dbUrl}/matches/${id}.json`,{method:"PUT",headers:{"Content-Type":"application/json"},body:JSON.stringify(m)});
+  });
+  setTimeout(()=>{ alert("تم حفظ النتائج"); loadMatches(); },500);
+}
+
+// ------------------- البداية -------------------
+loadTeams();
+loadMatches();
+</script>
+
+</body>
+</html>

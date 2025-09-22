@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="ar">
+<head>
+<meta charset="UTF-8">
+<title>برنامج البطولة</title>
+<style>
+body{font-family:Arial;direction:rtl;padding:20px;background:#f4f4f4;}
+section{background:#fff;padding:15px;margin:15px 0;border-radius:8px;box-shadow:0 0 5px rgba(0,0,0,0.1);}
+</style>
+</head>
+<body>
+<h1>برنامج البطولة</h1>
+<section id="upcomingMatches"></section>
+
+<script>
+const dbUrl="https://howat-b10bd-default-rtdb.europe-west1.firebasedatabase.app/";
+
+function loadProgram(){
+  fetch(`${dbUrl}/matches.json`).then(r=>r.json()).then(data=>{
+    const container=document.getElementById("upcomingMatches"); container.innerHTML="";
+    if(!data) {container.innerHTML="لا توجد مباريات"; return;}
+    Object.values(data).forEach(m=>{
+      if(m.score1==null || m.score2==null){
+        const div=document.createElement("div");
+        div.textContent=`الدورة ${m.round}: ${m.team1} - ${m.team2}`;
+        container.appendChild(div);
+      }
+    });
+  });
+}
+
+loadProgram();
+</script>
+</body>
+</html>
